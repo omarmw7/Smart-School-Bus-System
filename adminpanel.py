@@ -2,119 +2,150 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 
-# 1. إعدادات الاتصال بقاعدة البيانات
+# ==========================================
+# 1. SUPABASE DATABASE CONNECTION SETUP
+# ==========================================
+# Replace these placeholders with your actual Supabase Project URL and Anon Key
 URL = "YOUR_SUPABASE_URL"
 KEY = "YOUR_SUPABASE_ANON_KEY"
 supabase = create_client(URL, KEY)
 
-st.set_page_config(page_title="لوحة تحكم المدير - نظام الباص المدرسي", layout="wide")
+# Configure the Streamlit page layout and title
+st.set_page_config(page_title="Admin Panel - School Bus System", layout="wide")
+st.title("🛡️ Admin Panel - Smart School Bus System")
 
-st.title("🛡️ لوحة تحكم الإدارة - نظام الباص المدرسي الذكي")
+# Define the main navigation tabs for the admin dashboard
+tab1, tab2, tab3, tab4 = st.tabs([
+    "➕ Add New Student", 
+    "📋 Manage Students", 
+    "📊 Attendance Logs", 
+    "📍 Live Tracking"
+])
 
-# القائمة والتبويبات
-tab1, tab2, tab3, tab4 = st.tabs(["➕ إضافة طالب جديد", "📋 إدارة الطلاب", "📊 سجل الحركات", "📍 التتبع الحي (Live Tracking)"])
-
-# -------------------------------------------------------------
-# Tab 1: إضافة طالب جديد
-# -------------------------------------------------------------
+# ==========================================
+# TAB 1: ADD NEW STUDENT & LINK FINGERPRINT
+# ==========================================
 with tab1:
-    st.subheader("تسجيل طالب جديد وربطه برقم البصمة")
+    st.subheader("Register a New Student and Link Fingerprint ID")
+    
+    # Form container to handle input submission cleanly
     with st.form("add_student_form"):
         col1, col2 = st.columns(2)
+        
         with col1:
-            name = st.text_input("اسم الطالب بالكامل")
-            parent_phone = st.text_input("رقم هاتف ولي الأمر")
+            name = st.text_input("Full Name")
+            parent_phone = st.text_input("Parent Phone Number (for notifications)")
+            
         with col2:
-            fingerprint_id = st.number_input("رقم بصمة الإصبع (Fingerprint ID)", min_value=1, step=1)
-            bus_id = st.number_input("رقم الحافلة المخصصة", min_value=1, step=1)
+            # This ID corresponds directly to the template ID stored locally inside the bus fingerprint sensor
+            fingerprint_id = st.number_input("Fingerprint ID", min_value=1, step=1)
+            bus_id = st.number_input("Assigned Bus ID", min_value=1, step=1)
         
-        submitted = st.form_submit_button("حفظ الطالب في النظام")
+        submitted = st.form_submit_button("Save Student to Central Database")
         
+        # Action triggered upon clicking the submit button
         if submitted:
             if name and parent_phone:
-                data = {
+                student_data = {
                     "name": name,
                     "fingerprint_id": fingerprint_id,
                     "parent_phone": parent_phone,
                     "bus_id": bus_id,
-                    "status": "out_of_bus"
+                    "status": "out_of_bus"  # Default initial status
                 }
                 try:
-                    supabase.table("students").insert(data).execute()
-                    st.success(f"تم تسجيل الطالب {name} وربطه بالبصمة رقم ({fingerprint_id}) بنجاح!")
+                    # Insert record into the 'students' table on Supabase
+                    supabase.table("students").insert(student_data).execute()
+                    st.success(f"Student {name} successfully registered with Fingerprint ID ({fingerprint_id})!")
                 except Exception as e:
-                    st.error(f"خطأ: {e}")
+                    st.error(f"Error: Fingerprint ID might already be assigned to another student. Details: {e}")
             else:
-                st.warning("الرجاء تعبئة جميع الحقول المطلوبة.")
+                st.warning("Please fill in all required fields.")
 
-# -------------------------------------------------------------
-# Tab 2: إدارة الطلاب
-# -------------------------------------------------------------
+# ==========================================
+# TAB 2: MANAGE STUDENTS (VIEW & DELETE)
+# ==========================================
 with tab2:
-    st.subheader("📋 قائمة الطلاب المسجلين")
-    students_list = supabase.table("students").select("*").execute().data
+    st.subheader("📋 Registered Students Directory")
+    
+    # Fetch all student records from the database
+    response = supabase.table("students").select("*").execute()
+    students_list = response.data
     
     if students_list:
         for s in students_list:
             col_info, col_status, col_del = st.columns([3, 1, 1])
+            
             with col_info:
-                st.write(f"👤 **{s['name']}** | 🆔 بصمة: `{s['fingerprint_id']}` | 🚌 باص: `{s['bus_id']}`")
+                st.write(f"👤 **{s['name']}** | 🆔 Fingerprint: `{s['fingerprint_id']}` | 🚌 Bus: `{s['bus_id']}`")
+                st.caption(f"Parent Phone: {s['parent_phone']}")
+                
             with col_status:
+                # Display real-time boarding status badge
                 if s['status'] == 'in_bus':
-                    st.success("داخل الباص")
+                    st.success("In Bus")
                 else:
-                    st.info("خارج الباص")
+                    st.info("Out of Bus")
+                    
             with col_del:
-                if st.button("حذف", key=f"del_{s['student_id']}"):
+                # Delete button with a unique key per student
+                if st.button("Delete", key=f"del_{s['student_id']}"):
                     supabase.table("students").delete().eq("student_id", s['student_id']).execute()
-                    st.success(f"تم الحذف.")
-                    st.rerun()
+                    st.success(f"Student {s['name']} deleted.")
+                    st.rerun()  # Refresh the page to update the list
             st.divider()
     else:
-        st.info("لا يوجد طلاب مسجلين حتى الآن.")
+        st.info("No students registered yet. Use the first tab to add students.")
 
-# -------------------------------------------------------------
-# Tab 3: سجل الحركات
-# -------------------------------------------------------------
+# ==========================================
+# TAB 3: ATTENDANCE LOGS & HISTORY
+# ==========================================
 with tab3:
-    st.subheader("📊 أحدث الحركات")
-    logs_data = supabase.table("attendance_logs").select("*, students(name)").order("timestamp", desc=True).limit(20).execute().data
+    st.subheader("📊 Recent Check-In / Check-Out Activity")
+    
+    # Fetch recent logs joined with student names, ordered by timestamp descending
+    logs_response = supabase.table("attendance_logs").select("*, students(name)").order("timestamp", desc=True).limit(20).execute()
+    logs_data = logs_response.data
     
     if logs_data:
         formatted_logs = []
         for log in logs_data:
-            student_name = log.get('students', {}).get('name', 'غير معروف') if log.get('students') else 'غير معروف'
+            # Handle nested student data safely
+            student_name = log.get('students', {}).get('name', 'Unknown') if log.get('students') else 'Unknown'
             formatted_logs.append({
-                "اسم الطالب": student_name,
-                "رقم الباص": log['bus_id'],
-                "الحركة": "صعود" if log['action'] == 'CHECK_IN' else "نزول",
-                "الوقت": log['timestamp']
+                "Student Name": student_name,
+                "Bus ID": log['bus_id'],
+                "Action": "Check-In (Boarded)" if log['action'] == 'CHECK_IN' else "Check-Out (Exited)",
+                "Timestamp": log['timestamp']
             })
+        # Render clean table using Pandas DataFrame
         st.dataframe(pd.DataFrame(formatted_logs), use_container_width=True)
     else:
-        st.info("لا توجد سجلات حتى الآن.")
+        st.info("No attendance logs recorded yet.")
 
-# -------------------------------------------------------------
-# Tab 4: التتبع الحي (Live Tracking)
-# -------------------------------------------------------------
+# ==========================================
+# TAB 4: LIVE GPS TRACKING
+# ==========================================
 with tab4:
-    st.subheader("📍 خريطة التتبع الحي للحافلات المدرسية")
+    st.subheader("📍 Real-Time School Bus Tracking Map")
+    
+    # Fetch current coordinates and bus states from the 'buses' table
     buses_data = supabase.table("buses").select("*").execute().data
     
     if buses_data:
         df = pd.DataFrame(buses_data)
         
-        # التأكد من وجود أعمدة الإحداثيات وتصفية القيم الفارغة
+        # Verify coordinate columns exist and drop rows with missing GPS data
         if 'current_lat' in df.columns and 'current_lng' in df.columns:
             map_df = df.dropna(subset=['current_lat', 'current_lng'])
             if not map_df.empty:
-                # إعادة تسمية الأعمدة بالشكل الذي تتوقعه خريطة ستريمليت (latitude, longitude)
+                # Streamlit map expects 'latitude' and 'longitude' column names
                 map_df = map_df.rename(columns={'current_lat': 'latitude', 'current_lng': 'longitude'})
                 st.map(map_df, latitude='latitude', longitude='longitude', zoom=12)
             else:
-                st.warning("لا توجد إحداثيات GPS مسجلة للباصات حالياً.")
+                st.warning("No active GPS coordinates available for buses right now.")
         
-        st.markdown("### جدول تفاصيل الحافلات المتصلة:")
+        st.markdown("### Connected Buses Status Table:")
         st.dataframe(df, use_container_width=True)
     else:
-        st.info("لا توجد حافلات مسجلة في جدول الحافلات (buses).")
+        st.info("No buses registered in the 'buses' table.")
