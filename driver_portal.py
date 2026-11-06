@@ -4,8 +4,8 @@ import time
 
 def run():
     # Database Connection
-    URL = "YOUR_SUPABASE_URL"
-    KEY = "YOUR_SUPABASE_ANON_KEY"
+    URL = ""
+    KEY = ""
     supabase = create_client(URL, KEY)
 
     BUS_ID = 1  # Bus ID assigned to this specific driver session

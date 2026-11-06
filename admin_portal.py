@@ -2,18 +2,19 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 
+
 def run():
     # Database Connection
-    URL = "YOUR_SUPABASE_URL"
-    KEY = "YOUR_SUPABASE_ANON_KEY"
+    URL = ""
+    KEY = ""
     supabase = create_client(URL, KEY)
 
     st.title("🛡️ لوحة تحكم الإدارة - نظام الباص المدرسي الذكي")
-    
+
     tab1, tab2, tab3, tab4 = st.tabs([
-        "➕ إضافة طالب جديد", 
-        "📋 إدارة الطلاب", 
-        "📊 سجل الحركات", 
+        "➕ إضافة طالب جديد",
+        "📋 إدارة الطلاب",
+        "📊 سجل الحركات",
         "📍 التتبع الحي (Live Tracking)"
     ])
 
@@ -28,7 +29,7 @@ def run():
             with col2:
                 fingerprint_id = st.number_input("رقم بصمة الإصبع (Fingerprint ID)", min_value=1, step=1)
                 bus_id = st.number_input("رقم الحافلة المخصصة", min_value=1, step=1)
-            
+
             submitted = st.form_submit_button("حفظ الطالب في النظام")
             if submitted:
                 if name and parent_phone:
@@ -73,7 +74,8 @@ def run():
     # --- TAB 3: ATTENDANCE LOGS ---
     with tab3:
         st.subheader("📊 أحدث حركات الصعود والنزول")
-        logs_data = supabase.table("attendance_logs").select("*, students(name)").order("timestamp", desc=True).limit(20).execute().data
+        logs_data = supabase.table("attendance_logs").select(
+            "*, students(name)").order("timestamp", desc=True).limit(20).execute().data
         if logs_data:
             formatted_logs = []
             for log in logs_data:

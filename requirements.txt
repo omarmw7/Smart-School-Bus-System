@@ -2,3 +2,5 @@ streamlit
 supabase
 pandas
 flask
+flask_session
+dotenv
