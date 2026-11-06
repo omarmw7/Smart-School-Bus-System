@@ -19,7 +19,11 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
-TIMEZONE = ZoneInfo(os.getenv("APP_TIMEZONE", "UTC"))
+try:
+    TIMEZONE = ZoneInfo(os.getenv("APP_TIMEZONE", "UTC"))
+except Exception:
+    app.logger.warning("Invalid APP_TIMEZONE, falling back to UTC")
+    TIMEZONE = ZoneInfo("UTC")
 
 STUDENT_STATUSES = ("active", "inactive")
 TRIP_STATUSES = ("idle", "on_route", "finished")
