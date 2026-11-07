@@ -1,0 +1,10 @@
+{% macro student_badge(status) %}
+  {% if status == 'active' %}<span class="badge badge-ok">نشط</span>
+  {% else %}<span class="badge badge-bad">غير نشط</span>{% endif %}
+{% endmacro %}
+
+{% macro trip_badge(status) %}
+  {% if status == 'on_route' %}<span class="badge badge-ok">على الطريق</span>
+  {% elif status == 'finished' %}<span class="badge badge-muted">انتهت الرحلة</span>
+  {% else %}<span class="badge badge-warn">متوقفة</span>{% endif %}
+{% endmacro %}
