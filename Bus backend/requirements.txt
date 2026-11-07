@@ -1,0 +1,4 @@
+Flask>=3.0
+supabase
+python-dotenv
+# للتشغيل الفعلي على Linux: gunicorn
