@@ -10,6 +10,7 @@
     <div class="actions">
       <a class="btn" href="/students/{{ student.student_id }}/edit">تعديل</a>
       <form method="post" action="/students/{{ student.student_id }}/delete" onsubmit="return confirm('هل تريد حذف هذا الطالب؟')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger">حذف</button>
       </form>
     </div>

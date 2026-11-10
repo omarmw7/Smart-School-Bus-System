@@ -5,6 +5,7 @@
 
 {% block content %}
   <form method="post" class="form-card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label for="driver_name">اسم السائق</label>
       <input type="text" id="driver_name" name="driver_name" value="{{ bus.driver_name or '' }}" required autofocus>

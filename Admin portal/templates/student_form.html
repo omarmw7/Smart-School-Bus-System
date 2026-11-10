@@ -5,6 +5,7 @@
 
 {% block content %}
   <form method="post" class="form-card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label for="name">اسم الطالب</label>
       <input type="text" id="name" name="name" value="{{ student.name or '' }}" required autofocus>

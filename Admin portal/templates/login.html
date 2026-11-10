@@ -21,7 +21,7 @@
       <p>استخدم حساب المسؤول للمتابعة.</p>
 
       <form method="post" action="{{ url_for('login') }}" novalidate>
-        {# إذا كنت تستخدم Flask-WTF أضف: <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> #}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
           <label for="email">البريد الإلكتروني</label>
           <input type="email" id="email" name="email" class="ltr" autocomplete="email" required autofocus>
@@ -31,7 +31,6 @@
           <input type="password" id="password" name="password" autocomplete="current-password" required>
         </div>
         <div class="row">
-          <label><input type="checkbox" name="remember"> ابقني مسجّلاً</label>
           <a href="/forgot-password">نسيت كلمة المرور؟</a>
         </div>
         <button type="submit" class="btn btn-primary btn-block">تسجيل الدخول</button>

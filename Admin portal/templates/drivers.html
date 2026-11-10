@@ -26,6 +26,7 @@
             <td>
               <a href="/drivers/{{ b.bus_id }}/edit">تعديل</a>
               <form method="post" action="/drivers/{{ b.bus_id }}/delete" class="inline" onsubmit="return confirm('هل تريد حذف هذه الحافلة؟')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="link-danger">حذف</button>
               </form>
             </td>
