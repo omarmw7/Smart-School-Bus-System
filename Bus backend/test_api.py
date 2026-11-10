@@ -208,3 +208,9 @@ def test_overlapping_absence_range_is_rejected(env):
     separate = client.post("/api/parents/absence-requests", headers=PARENT, json={
         "type": "absent", "start_date": (d + timedelta(days=10)).isoformat()})
     assert separate.status_code == 201
+
+
+def test_parent_portal_page_is_served(env):
+    client, _ = env
+    r = client.get("/parent")
+    assert r.status_code == 200 and "بوابة ولي الأمر" in r.get_data(as_text=True)

@@ -21,6 +21,11 @@ def create_app(config=Config):
     def health():
         return jsonify(ok=True)
 
+    @app.get("/parent")
+    def parent_portal():
+        """بوابة ولي الأمر (صفحة واحدة تستدعي /api/parents من نفس الخادم)."""
+        return app.send_static_file("parent.html")
+
     # كل الردود JSON بنفس الشكل: {ok, error, message}
     @app.errorhandler(ApiError)
     def handle_api_error(error):
