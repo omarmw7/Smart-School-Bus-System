@@ -13,7 +13,6 @@ STATE_AT_SCHOOL = "at_school"
 
 
 class Config:
-    SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-only-change-me")
 
     # Supabase: استخدم مفتاح service_role / secret على السيرفر فقط
     SUPABASE_URL = os.getenv("SUPABASE_URL")

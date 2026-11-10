@@ -78,13 +78,17 @@ def create_absence_request():
     db = get_supabase()
     student_id = g.student["student_id"]
 
-    duplicate = first_row(
+    # لا يُسمح بطلب يتداخل مع فترة طلب قائم (قيد الانتظار أو مقبول)
+    overlap = first_row(
         db.table("absence_requests").select("request_id")
-        .eq("student_id", student_id).eq("start_date", start.isoformat())
-        .eq("request_type", request_type).eq("status", "pending").limit(1).execute()
+        .eq("student_id", student_id)
+        .in_("status", ["pending", "approved"])
+        .lte("start_date", end.isoformat())
+        .gte("end_date", start.isoformat())
+        .limit(1).execute()
     )
-    if duplicate:
-        raise ApiError("يوجد طلب قيد الانتظار لنفس اليوم.", 409, "duplicate_request")
+    if overlap:
+        raise ApiError("يوجد طلب قائم يتداخل مع هذه الفترة.", 409, "duplicate_request")
 
     created = db.table("absence_requests").insert({
         "student_id": student_id,

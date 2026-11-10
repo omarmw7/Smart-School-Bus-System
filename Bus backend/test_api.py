@@ -1,16 +1,35 @@
-"""اختبارات تعمل بدون Supabase حقيقي: python -m pytest tests"""
+"""اختبارات تعمل بدون Supabase حقيقي.
+
+التشغيل من مجلد "Bus backend":  python -m pytest test_api.py
+"""
 import os
 import sys
 from datetime import datetime, timedelta, timezone
 
 os.environ.update(SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="fake", DEVICE_API_KEY="device-key")
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pytest  # noqa: E402
 
 import extensions  # noqa: E402
 from app import create_app  # noqa: E402
 from config import Config  # noqa: E402
+
+
+def _match(row, filters):
+    for key, op, value in filters:
+        cell = row.get(key)
+        if op == "eq" and cell != value:
+            return False
+        if op == "neq" and cell == value:
+            return False
+        if op == "in" and cell not in value:
+            return False
+        if op == "lte" and not (cell is not None and cell <= value):
+            return False
+        if op == "gte" and not (cell is not None and cell >= value):
+            return False
+    return True
 
 
 class FakeQuery:
@@ -23,12 +42,16 @@ class FakeQuery:
     def select(self, *a, **k): return self
     def insert(self, payload): self.op, self.payload = "insert", payload; return self
     def update(self, payload): self.op, self.payload = "update", payload; return self
-    def eq(self, key, value): self.filters.append((key, value)); return self
+    def eq(self, key, value): self.filters.append((key, "eq", value)); return self
+    def neq(self, key, value): self.filters.append((key, "neq", value)); return self
+    def in_(self, key, values): self.filters.append((key, "in", values)); return self
+    def lte(self, key, value): self.filters.append((key, "lte", value)); return self
+    def gte(self, key, value): self.filters.append((key, "gte", value)); return self
     def order(self, col, desc=False): self._order = (col, desc); return self
     def limit(self, n): self._limit = n; return self
 
     def execute(self):
-        match = [r for r in self.rows if all(r.get(k) == v for k, v in self.filters)]
+        match = [r for r in self.rows if _match(r, self.filters)]
         if self.op == "insert":
             row = dict(self.payload)
             row.setdefault("request_id", len(self.rows) + 1)
@@ -93,6 +116,13 @@ def test_gps_validation(env, body, status):
     assert client.post("/api/gps", headers=DEVICE, json=body).status_code == status
 
 
+def test_infinity_is_rejected_not_server_error(env):
+    client, _ = env
+    r = client.post("/api/gps", headers=DEVICE, data='{"bus_id": Infinity, "latitude": 1, "longitude": 1}',
+                    content_type="application/json")
+    assert r.status_code == 400 and r.get_json()["error"] == "invalid_field"
+
+
 def test_attendance_flow(env):
     client, fake = env
     client.post("/api/gps", headers=DEVICE, json={"bus_id": 1, "latitude": 25.2, "longitude": 55.3})
@@ -114,6 +144,30 @@ def test_attendance_unknown_student_and_bad_action(env):
                        json={"fingerprint_id": 999, "bus_id": 1, "action": "board"}).status_code == 404
     assert client.post("/api/attendance", headers=DEVICE,
                        json={"fingerprint_id": 12, "bus_id": 1, "action": "fly"}).status_code == 400
+
+
+def test_board_twice_is_rejected_after_debounce_window(env):
+    client, fake = env
+    client.post("/api/attendance", headers=DEVICE, json={"fingerprint_id": 12, "bus_id": 1, "action": "board"})
+    later = (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()
+    r = client.post("/api/attendance", headers=DEVICE,
+                    json={"fingerprint_id": 12, "bus_id": 1, "action": "board", "timestamp": later})
+    assert r.status_code == 409 and r.get_json()["error"] == "invalid_sequence"
+    assert len(fake.store["attendance_logs"]) == 1
+
+
+def test_late_offline_event_does_not_overwrite_newer_state(env):
+    client, fake = env
+    now = datetime.now(timezone.utc)
+    client.post("/api/attendance", headers=DEVICE, json={
+        "fingerprint_id": 12, "bus_id": 1, "action": "board", "timestamp": now.isoformat()})
+    old = (now - timedelta(hours=1)).isoformat()
+    r = client.post("/api/attendance", headers=DEVICE, json={
+        "fingerprint_id": 12, "bus_id": 1, "action": "exit", "destination": "home", "timestamp": old})
+    assert r.status_code == 201
+    assert r.get_json()["state"] == "on_bus"
+    assert fake.store["students"][0]["current_state"] == "on_bus"
+    assert len(fake.store["attendance_logs"]) == 2  # الحدث مسجَّل، لكن الحالة لم تتغير
 
 
 def test_parent_status_and_token(env):
@@ -139,3 +193,18 @@ def test_absence_requests(env):
     rid = r.get_json()["request"]["request_id"]
     assert client.delete(f"/api/parents/absence-requests/{rid}", headers=PARENT).status_code == 200
     assert client.delete(f"/api/parents/absence-requests/{rid}", headers=PARENT).status_code == 409
+
+
+def test_overlapping_absence_range_is_rejected(env):
+    client, _ = env
+    d = (datetime.now(timezone.utc) + timedelta(days=3)).date()
+    ok = client.post("/api/parents/absence-requests", headers=PARENT, json={
+        "type": "absent", "start_date": d.isoformat(), "end_date": (d + timedelta(days=3)).isoformat()})
+    assert ok.status_code == 201
+    overlap = client.post("/api/parents/absence-requests", headers=PARENT, json={
+        "type": "no_bus", "start_date": (d + timedelta(days=2)).isoformat(),
+        "end_date": (d + timedelta(days=5)).isoformat()})
+    assert overlap.status_code == 409
+    separate = client.post("/api/parents/absence-requests", headers=PARENT, json={
+        "type": "absent", "start_date": (d + timedelta(days=10)).isoformat()})
+    assert separate.status_code == 201

@@ -40,7 +40,7 @@ def _number(data, field, kind, minimum, maximum, required, default):
         raise _invalid(field, "يجب أن يكون رقمًا")
     try:
         converted = kind(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise _invalid(field, "يجب أن يكون رقمًا")
     if kind is int and isinstance(value, float) and not value.is_integer():
         raise _invalid(field, "يجب أن يكون عددًا صحيحًا")
@@ -94,7 +94,7 @@ def get_date(data, field, *, required=True, default=None):
         return default
     try:
         return date.fromisoformat(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise _invalid(field, "يجب أن يكون تاريخًا بصيغة YYYY-MM-DD")
 
 

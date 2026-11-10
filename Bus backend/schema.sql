@@ -1,3 +1,45 @@
+-- ------------------------------------------------------------
+-- 0) الجداول الأساسية (أُخذت أعمدتها من الكود). إن وُجدت مسبقًا لا تُغيَّر.
+--    تحقق من أنها تطابق قاعدة بياناتك قبل الاعتماد عليها.
+-- ------------------------------------------------------------
+create table if not exists buses (
+  bus_id       int4 generated always as identity primary key,
+  driver_name  text not null,
+  trip_status  text not null default 'idle'
+               check (trip_status in ('idle', 'on_route', 'finished')),
+  current_lat  float8,
+  current_lng  float8,
+  last_updated timestamptz
+);
+
+create table if not exists students (
+  student_id     int4 generated always as identity primary key,
+  name           text not null,
+  fingerprint_id int4 not null,
+  parent_phone   text not null,
+  bus_id         int4 references buses(bus_id),
+  status         text not null default 'active' check (status in ('active', 'inactive')),
+  created_at     timestamptz not null default now()
+);
+
+create table if not exists attendance_logs (
+  log_id       int8 generated always as identity primary key,
+  student_id   int4 not null references students(student_id) on delete cascade,
+  bus_id       int4 not null references buses(bus_id),
+  action       text not null check (action in ('board', 'exit')),
+  location_lat float8,
+  location_lng float8,
+  "timestamp"  timestamptz not null default now()
+);
+
+create table if not exists admins (
+  admin_id      int4 generated always as identity primary key,
+  email         text not null unique,
+  name          text,
+  password_hash text not null,
+  created_at    timestamptz not null default now()
+);
+
 -- ============================================================
 -- نظام الباص المدرسي الذكي: تعديلات قاعدة البيانات
 -- شغّله مرة واحدة في Supabase: SQL Editor -> New query -> Run

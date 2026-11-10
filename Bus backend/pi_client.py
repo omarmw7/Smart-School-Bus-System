@@ -40,12 +40,16 @@ def send_gps(fix):
 
 
 def send_attendance(fingerprint_id, action, destination="school"):
-    """action: board | exit ، destination: school | home (مع exit فقط)."""
+    """action: board | exit ، destination: school | home (مع exit فقط).
+
+    ملاحظة: لا توجد حلقة لقراءة قارئ البصمة في هذا الملف بعد؛ استدعِ هذه الدالة
+    من كود قارئ البصمة الخاص بجهازك عند كل لمسة بصمة.
+    """
     r = session.post(f"{SERVER_URL}/api/attendance", timeout=5, json={
         "fingerprint_id": fingerprint_id, "bus_id": BUS_ID,
         "action": action, "destination": destination})
     if not r.ok:
-        print("رفض السيرفر:", r.json().get("message"))
+        print("رفض السيرفر:", r.json().get("message", r.text))
         return None
     return r.json()   # يحتوي student_name لعرضه أو نطقه عند الصعود
 
@@ -58,4 +62,6 @@ if __name__ == "__main__":
                 send_gps(fix)
         except requests.RequestException as exc:
             print("تعذّر الإرسال:", exc)
+        except Exception as exc:  # gpsd غير شغّال أو خطأ في القراءة: لا نوقف البرنامج
+            print("تعذّرت قراءة GPS:", exc)
         time.sleep(GPS_INTERVAL)

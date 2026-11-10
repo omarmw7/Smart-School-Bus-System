@@ -54,6 +54,28 @@ def record_attendance():
         if 0 <= elapsed < current_app.config["ATTENDANCE_DEBOUNCE_SECONDS"]:
             return jsonify(ok=True, duplicate=True, student_name=student["name"]), 200
 
+    # الحالة الحالية للطالب ووقت آخر تغيير لها
+    status_row = first_row(
+        db.table("students").select("current_state,state_updated_at")
+        .eq("student_id", student["student_id"]).limit(1).execute()
+    )
+    current_state = status_row["current_state"] if status_row else STATE_AT_HOME
+    state_updated = (parse_db_time(status_row["state_updated_at"])
+                     if status_row and status_row.get("state_updated_at") else None)
+
+    # الحدث المتأخر (وصل بعد انقطاع الإنترنت) لا يغيّر الحالة إذا كانت هناك حالة أحدث
+    is_newest = state_updated is None or when >= state_updated
+    warnings = []
+
+    if is_newest and action == "board" and current_state == STATE_ON_BUS:
+        raise ApiError("الطالب على الحافلة بالفعل.", 409, "invalid_sequence")
+    if is_newest and action == "exit" and current_state != STATE_ON_BUS:
+        # لا نرفض النزول: الواقع أهم من السجل، لكن نلفت النظر إلى أن الصعود غير مسجّل
+        warnings.append("لم يُسجَّل صعود سابق لهذا الطالب.")
+
+    if student["bus_id"] != bus_id:
+        warnings.append("الطالب مسجّل على حافلة أخرى.")
+
     # الموقع المسجّل مع الحدث هو آخر موقع معروف للباص
     db.table("attendance_logs").insert({
         "student_id": student["student_id"],
@@ -64,14 +86,18 @@ def record_attendance():
         "timestamp": when.isoformat(),
     }).execute()
 
-    if action == "board":
-        new_state = STATE_ON_BUS
+    if not is_newest:
+        warnings.append("حدث متأخر: لم يُغيّر الحالة الحالية للطالب.")
+        new_state = current_state
     else:
-        new_state = STATE_AT_HOME if destination == "home" else STATE_AT_SCHOOL
-    db.table("students").update({
-        "current_state": new_state,
-        "state_updated_at": when.isoformat(),
-    }).eq("student_id", student["student_id"]).execute()
+        if action == "board":
+            new_state = STATE_ON_BUS
+        else:
+            new_state = STATE_AT_HOME if destination == "home" else STATE_AT_SCHOOL
+        db.table("students").update({
+            "current_state": new_state,
+            "state_updated_at": when.isoformat(),
+        }).eq("student_id", student["student_id"]).execute()
 
     response = {
         "ok": True,
@@ -81,6 +107,6 @@ def record_attendance():
         "state": new_state,
         "recorded_at": when.isoformat(),
     }
-    if student["bus_id"] != bus_id:
-        response["warning"] = "الطالب مسجّل على حافلة أخرى."
+    if warnings:
+        response["warning"] = " ".join(warnings)
     return jsonify(response), 201
