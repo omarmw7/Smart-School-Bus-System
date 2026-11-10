@@ -1,4 +1,5 @@
 import os
+import secrets
 from collections import Counter
 from datetime import datetime
 from functools import wraps
@@ -27,6 +28,27 @@ except Exception:
 
 STUDENT_STATUSES = ("active", "inactive")
 TRIP_STATUSES = ("idle", "on_route", "finished")
+
+
+# ---------- CSRF ----------
+@app.context_processor
+def inject_csrf_token():
+    def csrf_token():
+        if "_csrf_token" not in session:
+            session["_csrf_token"] = secrets.token_urlsafe(32)
+        return session["_csrf_token"]
+    return {"csrf_token": csrf_token}
+
+
+@app.before_request
+def verify_csrf_token():
+    """كل طلب POST يجب أن يحمل csrf_token المطابق لجلسة المستخدم."""
+    if request.method != "POST":
+        return
+    expected = session.get("_csrf_token", "")
+    sent = request.form.get("csrf_token", "")
+    if not expected or not secrets.compare_digest(sent, expected):
+        abort(400, description="انتهت صلاحية الصفحة. حدّثها وأعد المحاولة.")
 
 
 # ---------- helpers ----------
@@ -107,7 +129,7 @@ def login():
         if not rows or not check_password_hash(rows[0]["password_hash"], password):
             return login_helper("البريد الإلكتروني أو كلمة المرور غير صحيحة.")
 
-        session.clear()
+        session.clear()  # يبطل أي جلسة قديمة (ومعها رمز CSRF القديم)
         session["user_id"] = rows[0]["admin_id"]
         session["username"] = rows[0].get("name") or rows[0]["email"]
         return redirect("/")
@@ -115,6 +137,11 @@ def login():
     if session.get("user_id"):
         return redirect("/")
     return render_template("login.html")
+
+
+@app.route("/forgot-password")
+def forgot_password():
+    return render_template("forgot_password.html")
 
 
 @app.route("/logout")
