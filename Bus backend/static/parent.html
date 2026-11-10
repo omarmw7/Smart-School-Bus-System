@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>بوابة ولي الأمر | مسار</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --text: #1d2733; --muted: #6b7785;
+    --brand: #1f6feb; --ok: #15803d; --warn: #b45309; --bad: #b42318; --line: #e3e8ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1419; --card: #18212b; --text: #e8edf3; --muted: #97a3b1;
+      --brand: #4c8dff; --ok: #3fb950; --warn: #d29922; --bad: #f85149; --line: #2a3643;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1419; --card: #18212b; --text: #e8edf3; --muted: #97a3b1;
+    --brand: #4c8dff; --ok: #3fb950; --warn: #d29922; --bad: #f85149; --line: #2a3643;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, "Segoe UI", Tahoma, sans-serif; line-height: 1.6; }
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 18px; margin: 0; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 10px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .big { font-size: 22px; font-weight: 700; margin: 4px 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; border: 1px solid currentColor; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); } .muted-pill { color: var(--muted); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  label { display: block; font-size: 14px; margin: 10px 0 4px; color: var(--muted); }
+  input, select, textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  input.ltr { direction: ltr; text-align: right; }
+  .btn { font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn-link { background: none; border: none; color: var(--bad); padding: 4px 0; cursor: pointer; font: inherit; }
+  .btn-block { width: 100%; margin-top: 14px; }
+  .alert { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin: 0; }
+  .alert-error { background: rgba(180,35,24,.1); color: var(--bad); }
+  .alert-ok { background: rgba(21,128,61,.1); color: var(--ok); }
+  .alert-warn { background: rgba(180,83,9,.12); color: var(--warn); }
+  ul.list { list-style: none; padding: 0; margin: 0; }
+  ul.list li { border-top: 1px solid var(--line); padding: 10px 0; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+  ul.list li:first-child { border-top: none; }
+  .hidden { display: none !important; }
+  .ltr { direction: ltr; unicode-bidi: isolate; }
+</style>
+</head>
+<body>
+<header>
+  <h1>بوابة ولي الأمر</h1>
+  <button class="btn" id="logout" type="button" hidden>تسجيل الخروج</button>
+</header>
+
+<main>
+  <!-- شاشة الدخول -->
+  <section class="card" id="login-view">
+    <h2>أدخل رمز ولي الأمر</h2>
+    <p class="muted">الرمز يصلك من إدارة المدرسة. احتفظ به في مكان آمن.</p>
+    <form id="login-form" autocomplete="off">
+      <label for="token">رمز ولي الأمر</label>
+      <input id="token" class="ltr" type="password" required autocomplete="off">
+      <label style="display:flex;gap:8px;align-items:center;margin-top:12px;">
+        <input type="checkbox" id="remember" style="width:auto;"> ابقِ الجلسة في هذا المتصفح حتى أغلقه
+      </label>
+      <button class="btn btn-primary btn-block" type="submit">دخول</button>
+    </form>
+    <p class="alert alert-error hidden" id="login-error" role="alert"></p>
+  </section>
+
+  <!-- شاشة المتابعة -->
+  <div id="app-view" class="hidden" style="display:grid;gap:14px;">
+    <section class="card" aria-live="polite">
+      <div class="row">
+        <div>
+          <div class="muted">الطالب</div>
+          <div class="big" id="student-name">—</div>
+        </div>
+        <span class="pill" id="student-state">—</span>
+      </div>
+      <p class="muted" id="state-since"></p>
+    </section>
+
+    <section class="card">
+      <h2>الحافلة</h2>
+      <p id="bus-line" class="muted">—</p>
+      <p id="bus-stale" class="alert alert-warn hidden">موقع الحافلة قديم، قد لا يكون محدَّثًا.</p>
+      <div class="row" style="margin-top:8px;">
+        <span class="muted" id="bus-updated"></span>
+        <a class="btn hidden" id="bus-map" target="_blank" rel="noopener">عرض الموقع على الخريطة</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>آخر حركة</h2>
+      <p id="last-event" class="muted">لا توجد حركات بعد.</p>
+    </section>
+
+    <section class="card">
+      <h2>طلب غياب أو عدم استخدام الباص</h2>
+      <form id="request-form">
+        <label for="req-type">نوع الطلب</label>
+        <select id="req-type">
+          <option value="absent">غياب</option>
+          <option value="no_bus">عدم استخدام الباص</option>
+        </select>
+        <div class="row" style="gap:10px;">
+          <div style="flex:1;min-width:140px;">
+            <label for="req-start">من تاريخ</label>
+            <input id="req-start" type="date" class="ltr" required>
+          </div>
+          <div style="flex:1;min-width:140px;">
+            <label for="req-end">إلى تاريخ (اختياري)</label>
+            <input id="req-end" type="date" class="ltr">
+          </div>
+        </div>
+        <label for="req-reason">السبب (اختياري)</label>
+        <textarea id="req-reason" rows="2" maxlength="500"></textarea>
+        <button class="btn btn-primary btn-block" type="submit">إرسال الطلب</button>
+      </form>
+      <p class="alert hidden" id="request-msg" role="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>طلباتي</h2>
+      <ul class="list" id="requests"></ul>
+    </section>
+
+    <p class="muted" style="text-align:center;">يتحدّث الموقع تلقائيًا كل 30 ثانية.</p>
+  </div>
+</main>
+
+<script>
+(() => {
+  const API = "/api/parents";
+  const KEY = "parentToken";
+  const STATE_LABEL = { at_home: "في المنزل", on_bus: "في الحافلة", at_school: "في المدرسة" };
+  const STATE_CLASS = { at_home: "muted-pill", on_bus: "ok", at_school: "ok" };
+  const TRIP_LABEL = { idle: "متوقفة", on_route: "على الطريق", finished: "انتهت الرحلة" };
+  const TYPE_LABEL = { absent: "غياب", no_bus: "عدم استخدام الباص" };
+  const STATUS_LABEL = { pending: "قيد المراجعة", approved: "مقبول", rejected: "مرفوض", cancelled: "ملغى" };
+  const STATUS_CLASS = { pending: "warn", approved: "ok", rejected: "bad", cancelled: "muted-pill" };
+
+  const $ = (id) => document.getElementById(id);
+  let token = null;
+  let timer = null;
+
+  // ---------- تخزين الرمز (اختياري، في المتصفح فقط) ----------
+  function saveToken(value, remember) {
+    try {
+      sessionStorage.removeItem(KEY); localStorage.removeItem(KEY);
+      (remember ? localStorage : sessionStorage).setItem(KEY, value);
+    } catch (_) { /* التخزين غير متاح: نكتفي بالذاكرة */ }
+    token = value;
+  }
+  function loadToken() {
+    try { return sessionStorage.getItem(KEY) || localStorage.getItem(KEY); } catch (_) { return null; }
+  }
+  function clearToken() {
+    try { sessionStorage.removeItem(KEY); localStorage.removeItem(KEY); } catch (_) {}
+    token = null;
+  }
+
+  // ---------- طلبات الخادم ----------
+  async function api(path, options = {}) {
+    const headers = { "X-Parent-Token": token, ...(options.headers || {}) };
+    if (options.body) headers["Content-Type"] = "application/json";
+    const res = await fetch(API + path, { ...options, headers });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      const err = new Error(data.message || "حدث خطأ. حاول مرة أخرى.");
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  // ---------- عرض (بدون innerHTML لبيانات المستخدم) ----------
+  function fmtDateTime(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d)) return "—";
+    return d.toLocaleString("ar", { dateStyle: "medium", timeStyle: "short" });
+  }
+  function fmtDate(s) {
+    if (!s) return "—";
+    const d = new Date(s + "T00:00:00");
+    return isNaN(d) ? s : d.toLocaleDateString("ar", { dateStyle: "medium" });
+  }
+  function setPill(el, text, cls) {
+    el.textContent = text;
+    el.className = "pill " + cls;
+  }
+
+  function renderStatus(data) {
+    $("student-name").textContent = data.student.name;
+    const st = data.student.state;
+    setPill($("student-state"), STATE_LABEL[st] || st, STATE_CLASS[st] || "");
+    $("state-since").textContent = data.student.state_updated_at
+      ? "منذ " + fmtDateTime(data.student.state_updated_at) : "";
+
+    const bus = data.bus;
+    if (bus) {
+      $("bus-line").textContent =
+        "السائق: " + bus.driver_name + " — الحالة: " + (TRIP_LABEL[bus.trip_status] || bus.trip_status);
+      $("bus-stale").classList.toggle("hidden", !bus.is_stale);
+      $("bus-updated").textContent = "آخر تحديث: " + fmtDateTime(bus.last_updated);
+      const mapLink = $("bus-map");
+      if (bus.latitude != null && bus.longitude != null) {
+        mapLink.href = "https://www.google.com/maps?q=" + bus.latitude + "," + bus.longitude;
+        mapLink.classList.remove("hidden");
+      } else {
+        mapLink.classList.add("hidden");
+      }
+    } else {
+      $("bus-line").textContent = "لا توجد معلومات عن الحافلة.";
+      $("bus-stale").classList.add("hidden");
+      $("bus-map").classList.add("hidden");
+    }
+
+    const ev = data.last_event;
+    $("last-event").textContent = ev
+      ? (ev.action === "board" ? "صعد الطالب الحافلة" : "نزل الطالب من الحافلة") + " — " + fmtDateTime(ev.timestamp)
+      : "لا توجد حركات بعد.";
+  }
+
+  function renderRequests(rows) {
+    const list = $("requests");
+    list.textContent = "";
+    if (!rows.length) {
+      const li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = "لا توجد طلبات بعد.";
+      list.appendChild(li);
+      return;
+    }
+    for (const r of rows) {
+      const li = document.createElement("li");
+      const info = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = TYPE_LABEL[r.request_type] || r.request_type;
+      const range = document.createElement("div");
+      range.className = "muted";
+      range.textContent = fmtDate(r.start_date) +
+        (r.end_date && r.end_date !== r.start_date ? " — " + fmtDate(r.end_date) : "");
+      info.append(title, range);
+      if (r.reason) {
+        const reason = document.createElement("div");
+        reason.className = "muted";
+        reason.textContent = r.reason;
+        info.appendChild(reason);
+      }
+      const right = document.createElement("div");
+      right.style.display = "grid";
+      right.style.justifyItems = "end";
+      const badge = document.createElement("span");
+      badge.className = "pill " + (STATUS_CLASS[r.status] || "");
+      badge.textContent = STATUS_LABEL[r.status] || r.status;
+      right.appendChild(badge);
+      if (r.status === "pending") {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "btn-link";
+        cancel.textContent = "إلغاء الطلب";
+        cancel.addEventListener("click", () => cancelRequest(r.request_id));
+        right.appendChild(cancel);
+      }
+      li.append(info, right);
+      list.appendChild(li);
+    }
+  }
+
+  function showMsg(id, text, kind) {
+    const el = $(id);
+    el.textContent = text;
+    el.className = "alert alert-" + kind;
+  }
+
+  // ---------- تدفق الشاشات ----------
+  function showLogin(message) {
+    stopRefresh();
+    $("app-view").classList.add("hidden");
+    $("login-view").classList.remove("hidden");
+    $("logout").hidden = true;
+    if (message) showMsg("login-error", message, "error");
+    $("token").focus();
+  }
+
+  function showApp() {
+    $("login-view").classList.add("hidden");
+    $("app-view").classList.remove("hidden");
+    $("logout").hidden = false;
+    $("req-start").min = new Date().toISOString().slice(0, 10);
+  }
+
+  async function refresh() {
+    try {
+      const [status, reqs] = await Promise.all([api("/status"), api("/absence-requests")]);
+      renderStatus(status);
+      renderRequests(reqs.requests || []);
+    } catch (err) {
+      if (err.status === 401) { clearToken(); showLogin("الرمز غير صالح أو منتهي. أدخل الرمز مرة أخرى."); return; }
+      showMsg("request-msg", "تعذّر تحديث البيانات: " + err.message, "error");
+    }
+  }
+
+  function startRefresh() {
+    stopRefresh();
+    timer = setInterval(refresh, 30000);
+  }
+  function stopRefresh() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
+  async function enter(value, remember) {
+    token = value;
+    try {
+      await api("/status");
+      saveToken(value, remember);
+      showApp();
+      await refresh();
+      startRefresh();
+    } catch (err) {
+      token = null;
+      if (err.status === 401) showLogin("الرمز غير صحيح. تأكد من كتابته كما أعطته لك المدرسة.");
+      else showLogin("تعذّر الاتصال بالخادم. حاول لاحقًا.");
+    }
+  }
+
+  // ---------- الأحداث ----------
+  $("login-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = $("token").value.trim();
+    $("token").value = "";
+    if (!value) return showLogin("أدخل الرمز.");
+    $("login-error").classList.add("hidden");
+    enter(value, $("remember").checked);
+  });
+
+  $("logout").addEventListener("click", () => {
+    clearToken();
+    showLogin();
+  });
+
+  $("request-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const start = $("req-start").value;
+    if (!start) return showMsg("request-msg", "اختر تاريخ البداية.", "error");
+    const body = { type: $("req-type").value, start_date: start,
+                   reason: $("req-reason").value.trim() || undefined };
+    const end = $("req-end").value;
+    if (end) body.end_date = end;
+    try {
+      await api("/absence-requests", { method: "POST", body: JSON.stringify(body) });
+      showMsg("request-msg", "تم إرسال الطلب، وسيُراجَع من إدارة المدرسة.", "ok");
+      $("request-form").reset();
+      $("req-type").value = "absent";
+      await refresh();
+    } catch (err) {
+      showMsg("request-msg", err.message, "error");
+    }
+  });
+
+  async function cancelRequest(id) {
+    if (!confirm("هل تريد إلغاء هذا الطلب؟")) return;
+    try {
+      await api("/absence-requests/" + id, { method: "DELETE" });
+      showMsg("request-msg", "تم إلغاء الطلب.", "ok");
+      await refresh();
+    } catch (err) {
+      showMsg("request-msg", err.message, "error");
+    }
+  }
+
+  // ---------- بداية ----------
+  const saved = loadToken();
+  let remembered = false;
+  try { remembered = !!localStorage.getItem(KEY); } catch (_) {}
+  if (saved) enter(saved, remembered);
+  else showLogin();
+})();
+</script>
+</body>
+</html>
