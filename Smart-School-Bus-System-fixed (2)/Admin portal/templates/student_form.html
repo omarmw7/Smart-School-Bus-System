@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ 'تعديل طالب' if student.student_id else 'إضافة طالب' }}{% endblock %}
+{% block page_title %}{{ 'تعديل طالب' if student.student_id else 'إضافة طالب' }}{% endblock %}
+
+{% block content %}
+  <form method="post" class="form-card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="name">اسم الطالب</label>
+      <input type="text" id="name" name="name" value="{{ student.name or '' }}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="fingerprint_id">رقم البصمة</label>
+      <input type="number" id="fingerprint_id" name="fingerprint_id" min="0" value="{{ student.fingerprint_id if student.fingerprint_id is not none else '' }}" required>
+    </div>
+    <div class="field">
+      <label for="parent_phone">هاتف ولي الأمر</label>
+      <input type="tel" id="parent_phone" name="parent_phone" class="ltr" value="{{ student.parent_phone or '' }}" required>
+    </div>
+    <div class="field">
+      <label for="bus_id">الحافلة</label>
+      <select id="bus_id" name="bus_id" required>
+        <option value="" disabled {% if not student.bus_id %}selected{% endif %}>اختر الحافلة</option>
+        {% for b in buses %}
+        <option value="{{ b.bus_id }}" {% if student.bus_id|string == b.bus_id|string %}selected{% endif %}>حافلة {{ b.bus_id }} - {{ b.driver_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="status">الحالة</label>
+      <select id="status" name="status">
+        <option value="active" {% if student.status != 'inactive' %}selected{% endif %}>نشط</option>
+        <option value="inactive" {% if student.status == 'inactive' %}selected{% endif %}>غير نشط</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary">حفظ</button>
+      <a class="btn" href="{{ '/students/' ~ student.student_id if student.student_id else '/students' }}">إلغاء</a>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>شاشة السائق | مسار</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root { --bg:#0f1419; --card:#18212b; --text:#e8edf3; --muted:#97a3b1; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --line:#2a3643; --brand:#4c8dff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, "Segoe UI", Tahoma, sans-serif; font-size:20px; line-height:1.5; }
+  main { padding:16px; display:grid; gap:14px; max-width:960px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 18px; }
+  h1 { font-size:28px; margin:0; }
+  h2 { font-size:21px; margin:0 0 10px; }
+  .muted { color:var(--muted); font-size:17px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pill { padding:6px 14px; border-radius:999px; background:var(--line); font-weight:700; }
+  .pill.ok { color:var(--ok); } .pill.warn { color:var(--warn); } .pill.bad { color:var(--bad); }
+  .counts { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .count { text-align:center; }
+  .big-num { font-size:64px; font-weight:800; line-height:1.1; }
+  .big-num.warn { color:var(--warn); } .big-num.ok { color:var(--ok); }
+  ul { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  li { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; border-radius:10px; background:var(--bg); }
+  li.fresh { outline:2px solid var(--brand); }
+  input, button { font:inherit; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); }
+  button { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; cursor:pointer; }
+  .hidden { display:none !important; }
+  .err { color:var(--bad); }
+  #map { height:380px; border-radius:12px; border:1px solid var(--line); }
+  .stop-badge { background:var(--brand); color:#fff; border-radius:50%; width:28px; height:28px; line-height:28px; text-align:center; font-weight:800; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); }
+</style>
+</head>
+<body>
+<main>
+  <section class="card" id="setup-view">
+    <h2>تشغيل شاشة الحافلة</h2>
+    <p class="muted">أدخل مفتاح الجهاز مرة واحدة. يُحفظ في هذا الجهاز فقط.</p>
+    <form id="setup-form" class="row">
+      <input id="bus-input" type="number" min="1" placeholder="رقم الحافلة" required style="width:160px;">
+      <input id="key-input" type="password" placeholder="مفتاح الجهاز" required style="flex:1;min-width:220px;" autocomplete="off">
+      <button type="submit">حفظ وتشغيل</button>
+    </form>
+  </section>
+
+  <div id="app-view" class="hidden" style="display:grid;gap:14px;">
+    <section class="card row">
+      <div>
+        <h1 id="bus-title">الحافلة</h1>
+        <div class="muted" id="updated">—</div>
+      </div>
+      <div class="row">
+        <span class="pill" id="direction">—</span>
+        <span class="pill" id="trip-pill">—</span>
+      </div>
+    </section>
+
+    <section class="card counts">
+      <div class="count">
+        <div class="muted" id="board-label">ينتظرون الصعود</div>
+        <div class="big-num warn" id="to-board">—</div>
+      </div>
+      <div class="count">
+        <div class="muted">على الحافلة الآن</div>
+        <div class="big-num ok" id="on-bus">—</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>المسار</h2>
+      <div id="map" aria-label="خريطة المسار"></div>
+      <p class="muted" id="map-note"></p>
+    </section>
+
+    <section class="card">
+      <h2>الحركات</h2>
+      <ul id="events"></ul>
+    </section>
+
+    <section class="card">
+      <h2>المحطات المتبقية</h2>
+      <ul id="stops"></ul>
+    </section>
+
+    <section class="card">
+      <h2>الطلاب</h2>
+      <ul id="roster"></ul>
+    </section>
+
+    <p class="muted" id="warning"></p>
+  </div>
+</main>
+
+<script>
+(() => {
+  const KEY = "bus_device";
+  const POLL_MS = 5000;
+  const $ = (id) => document.getElementById(id);
+  const STATE = { at_home: "في البيت", on_bus: "على الحافلة", at_school: "في المدرسة" };
+  const STATE_CLASS = { at_home: "warn", on_bus: "ok", at_school: "" };
+  const TRIP = { idle: ["لم تبدأ", "warn"], on_route: ["على الطريق", "ok"], finished: ["انتهت الرحلة", "bad"] };
+  const DIRECTION = { to_school: "إلى المدرسة", to_home: "عودة إلى البيوت" };
+
+  let lastLogId = null;   // آخر حركة وصلت (للتمييز بين الجديد والقديم)
+  const eventRows = [];   // أحدث الحركات أولاً
+  let timer = null;
+
+  function loadConfig() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (_) { return null; } }
+  function saveConfig(cfg) { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} }
+  function clearConfig() { try { localStorage.removeItem(KEY); } catch (_) {} }
+
+  function fmtKm(m) {
+    if (m == null) return "—";
+    return m >= 1000 ? (m / 1000).toFixed(1) + " كم" : Math.round(m) + " م";
+  }
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleTimeString("ar", { timeStyle: "short" });
+  }
+  function li(left, right, cls) {
+    const item = document.createElement("li");
+    const a = document.createElement("span"); a.textContent = left;
+    const b = document.createElement("span"); b.textContent = right;
+    if (cls) b.className = "pill " + cls;
+    item.append(a, b);
+    return item;
+  }
+  function eventText(e) {
+    const who = e.student_name;
+    if (e.action === "board") return who + " — صعد الحافلة";
+    return e.destination === "home" ? who + " — نزل عند البيت" : who + " — نزل في المدرسة";
+  }
+  function beep() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      osc.frequency.value = 880;
+      osc.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    } catch (_) {}
+  }
+
+  function renderEvents() {
+    const list = $("events");
+    list.textContent = "";
+    if (!eventRows.length) { list.appendChild(li("لا توجد حركات بعد", "", "")); return; }
+    eventRows.slice(0, 40).forEach((e, index) => {
+      const item = document.createElement("li");
+      if (e.fresh) item.className = "fresh";
+      const text = document.createElement("span"); text.textContent = eventText(e);
+      const time = document.createElement("span"); time.textContent = fmtTime(e.timestamp); time.className = "muted";
+      item.append(text, time);
+      list.appendChild(item);
+    });
+  }
+
+  function addEvents(events, announce) {
+    let added = 0;
+    for (const e of events) {
+      if (lastLogId !== null && e.log_id <= lastLogId) continue;
+      lastLogId = Math.max(lastLogId || 0, e.log_id);
+      const row = { ...e, fresh: announce };
+      eventRows.unshift(row);
+      if (announce) setTimeout(() => { row.fresh = false; renderEvents(); }, 8000);
+      added++;
+    }
+    if (announce && added) beep();
+    while (eventRows.length > 60) eventRows.pop();
+    if (added) renderEvents();
+  }
+
+  let map = null, mapLayer = null, lastRouteSig = "";
+  function drawMap(route) {
+    if (!window.L || !route.school) return;
+    if (!map) {
+      map = L.map("map");
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: "&copy; OpenStreetMap"
+      }).addTo(map);
+      mapLayer = L.layerGroup().addTo(map);
+    }
+    mapLayer.clearLayers();
+    const start = [route.start.latitude, route.start.longitude];
+    const school = [route.school.latitude, route.school.longitude];
+    const pts = [start, ...route.stops.map(s => [s.latitude, s.longitude]), school];
+
+    if (route.geometry && route.geometry.length > 1) {
+      L.polyline(route.geometry, { color: "#4c8dff", weight: 5 }).addTo(mapLayer);
+    } else {
+      L.polyline(pts, { color: "#4c8dff", weight: 5, dashArray: "10 8" }).addTo(mapLayer);
+    }
+
+    const busDot = L.circleMarker(start, { radius: 10, color: "#3fb950", fillColor: "#3fb950", fillOpacity: 1 });
+    busDot.bindTooltip("الحافلة").addTo(mapLayer);
+
+    for (const s of route.stops) {
+      const marker = L.marker([s.latitude, s.longitude], {
+        icon: L.divIcon({ className: "", html: '<div class="stop-badge">' + s.order + "</div>", iconSize: [28, 28] })
+      });
+      const label = document.createElement("span");
+      label.textContent = s.name + " (" + fmtKm(s.distance_from_previous_m) + ")";
+      marker.bindTooltip(label).addTo(mapLayer);
+    }
+
+    L.circleMarker(school, { radius: 10, color: "#d29922", fillColor: "#d29922", fillOpacity: 1 })
+      .bindTooltip("المدرسة").addTo(mapLayer);
+
+    // نعيد ضبط الإطار فقط لما تتغير قائمة المحطات (حتى لا تقفز الخريطة كل 5 ثواني)
+    const sig = route.stops.map(s => s.student_id).join(",");
+    if (sig !== lastRouteSig) {
+      map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
+      lastRouteSig = sig;
+    }
+    const noteParts = [];
+    noteParts.push(route.routing === "road"
+      ? "المسار على الطرق."
+      : "المسار بخطوط مستقيمة (تعذّر حساب مسار الطرق الآن).");
+    if (!route.start || route.start.latitude == null) noteParts.push("الحافلة بدون موقع GPS، لذلك يبدأ المسار من المدرسة.");
+    $("map-note").textContent = noteParts.join(" ");
+  }
+
+  function render(data) {
+    drawMap(data);
+    $("bus-title").textContent = "الحافلة " + data.bus_id;
+    const [tripText, tripCls] = TRIP[data.trip_status] || ["—", ""];
+    $("trip-pill").textContent = tripText;
+    $("trip-pill").className = "pill " + tripCls;
+    $("direction").textContent = DIRECTION[data.trip_direction] || "إلى المدرسة";
+    const returning = data.trip_direction === "to_home";
+    $("board-label").textContent = returning ? "ينتظرون الصعود في المدرسة" : "ينتظرون الصعود في البيوت";
+    $("to-board").textContent = data.counts.to_board;
+    $("on-bus").textContent = data.counts.on_bus;
+    $("updated").textContent = "آخر تحديث: " + new Date().toLocaleTimeString("ar", { timeStyle: "short" });
+
+    const stops = $("stops"); stops.textContent = "";
+    if (!data.stops.length) stops.appendChild(li("لا توجد محطات متبقية", "", ""));
+    for (const s of data.stops) {
+      stops.appendChild(li(s.order + ". " + s.name, fmtKm(s.distance_from_previous_m), ""));
+    }
+
+    const roster = $("roster"); roster.textContent = "";
+    for (const p of data.roster) {
+      roster.appendChild(li(p.name, STATE[p.state] || p.state, STATE_CLASS[p.state] || ""));
+    }
+    if (!data.roster.length) roster.appendChild(li("لا يوجد طلاب على هذه الحافلة", "", ""));
+
+    $("warning").textContent = data.without_location && data.without_location.length
+      ? "بدون موقع بيت (لم يدخلوا المسار): " + data.without_location.map(s => s.name).join("، ")
+      : "";
+  }
+
+  async function getJson(cfg, path) {
+    const res = await fetch(`/api/buses/${cfg.bus}${path}`, { headers: { "X-API-Key": cfg.key } });
+    let body = {};
+    try { body = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      const err = new Error(body.message || "تعذّر التحديث");
+      err.status = res.status;
+      throw err;
+    }
+    return body;
+  }
+
+  function start(cfg) {
+    $("setup-view").classList.add("hidden");
+    $("app-view").classList.remove("hidden");
+    const tick = async () => {
+      try {
+        const [route, events] = await Promise.all([
+          getJson(cfg, "/route"),
+          getJson(cfg, lastLogId === null ? "/events" : "/events?after=" + lastLogId),
+        ]);
+        render(route);
+        addEvents(events.events || [], lastLogId !== null);
+      } catch (err) {
+        if (err.status === 401) { clearConfig(); location.reload(); return; }
+        $("updated").textContent = "تعذّر التحديث، سنعيد المحاولة: " + err.message;
+      }
+    };
+    tick();
+    if (timer) clearInterval(timer);
+    timer = setInterval(tick, POLL_MS);
+  }
+
+  $("setup-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const cfg = { bus: parseInt($("bus-input").value, 10), key: $("key-input").value.trim() };
+    if (!cfg.bus || !cfg.key) return;
+    saveConfig(cfg);
+    start(cfg);
+  });
+
+  const existing = loadConfig();
+  const params = new URLSearchParams(location.search);
+  if (existing && existing.key) {
+    if (params.get("bus")) existing.bus = parseInt(params.get("bus"), 10);
+    start(existing);
+  } else if (params.get("bus")) {
+    $("bus-input").value = params.get("bus");
+  }
+})();
+</script>
+</body>
+</html>

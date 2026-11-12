@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+
+{% block title %}الإشعارات{% endblock %}
+{% block page_title %}الإشعارات{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <div class="panel-head"><h2>آخر 100 إشعار</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>الوقت</th><th>الحافلة</th><th>الإشعار</th></tr></thead>
+        <tbody>
+          {% for n in notes %}
+          <tr>
+            <td class="ltr">{{ n.created_at[:16]|replace('T', ' ') }}</td>
+            <td>{{ 'حافلة ' ~ n.bus_id if n.bus_id else '-' }}</td>
+            <td>{{ n.message }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="empty">لا توجد إشعارات بعد.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
