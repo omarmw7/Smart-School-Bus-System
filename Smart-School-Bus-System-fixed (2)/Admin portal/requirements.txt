@@ -1,4 +1,0 @@
-Flask>=3.0
-Flask-Session
-supabase
-python-dotenv
