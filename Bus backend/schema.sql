@@ -101,3 +101,48 @@ alter table absence_requests enable row level security;
 --   from pg_constraint
 --   where conrelid = 'attendance_logs'::regclass and contype = 'c';
 -- ------------------------------------------------------------
+
+-- ============================================================
+-- 5) موقع بيت الطالب (للمسار الديناميكي). آمن للتكرار.
+-- ============================================================
+alter table students add column if not exists home_lat float8;
+alter table students add column if not exists home_lng float8;
+
+-- ============================================================
+-- 6) الإشعارات: للإدارة (audience = 'admin') وللأهل (audience = 'parent')
+-- ============================================================
+create table if not exists notifications (
+  notification_id bigint generated always as identity primary key,
+  audience        text not null check (audience in ('admin', 'parent')),
+  kind            text not null,
+  message         text not null,
+  bus_id          int4 references buses(bus_id) on delete cascade,
+  student_id      int4 references students(student_id) on delete cascade,
+  created_at      timestamptz not null default now()
+);
+create index if not exists notifications_audience_idx on notifications (audience, notification_id desc);
+
+-- ============================================================
+-- 7) اتجاه الرحلة: to_school (صباحاً) أو to_home (عودة من المدرسة)
+-- ============================================================
+alter table buses add column if not exists trip_direction text
+  check (trip_direction in ('to_school', 'to_home'));
+
+-- ============================================================
+-- 8) اشتراكات إشعارات المتصفح (Web Push)
+-- ============================================================
+create table if not exists push_subscriptions (
+  subscription_id bigint generated always as identity primary key,
+  audience        text not null check (audience in ('admin', 'parent')),
+  student_id      int4 references students(student_id) on delete cascade,
+  endpoint        text unique not null,
+  p256dh          text not null,
+  auth            text not null,
+  created_at      timestamptz not null default now()
+);
+
+-- ============================================================
+-- 9) وجهة النزول في سجل الحضور (المدرسة أو البيت) لعرضها للسائق
+-- ============================================================
+alter table attendance_logs add column if not exists destination text
+  check (destination in ('school', 'home'));

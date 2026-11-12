@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, g, jsonify
 
 from auth import require_parent_token
 from extensions import first_row, get_supabase
+from push import save_subscription
 from utils import ApiError, get_choice, get_date, get_text, json_body, parse_db_time
 
 bp = Blueprint("parents", __name__, url_prefix="/api/parents")
@@ -110,6 +111,32 @@ def list_absence_requests():
         .execute().data
     )
     return jsonify(ok=True, requests=rows)
+
+
+@bp.post("/push-subscription")
+@require_parent_token
+def save_push_subscription():
+    """يحفظ اشتراك إشعارات المتصفح لولي الأمر (مرتبط بطالبه فقط)."""
+    data = json_body()
+    sub = data.get("endpoint")
+    keys = data.get("keys") or {}
+    if not isinstance(sub, str) or not sub.startswith("https://") or not keys.get("p256dh") or not keys.get("auth"):
+        raise ApiError("اشتراك الإشعارات غير صالح.", 400, "invalid_subscription")
+    save_subscription(get_supabase(), audience="parent", student_id=g.student["student_id"],
+                      subscription={"endpoint": sub, "keys": {"p256dh": keys["p256dh"], "auth": keys["auth"]}})
+    return jsonify(ok=True), 201
+
+
+@bp.get("/notifications")
+@require_parent_token
+def list_notifications():
+    """آخر إشعارات الصعود والنزول لهذا الطالب فقط."""
+    rows = (
+        get_supabase().table("notifications").select("notification_id,kind,message,created_at")
+        .eq("audience", "parent").eq("student_id", g.student["student_id"])
+        .order("notification_id", desc=True).limit(30).execute().data
+    )
+    return jsonify(ok=True, notifications=rows)
 
 
 @bp.delete("/absence-requests/<int:request_id>")

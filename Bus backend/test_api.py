@@ -6,7 +6,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-os.environ.update(SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="fake", DEVICE_API_KEY="device-key")
+os.environ.update(SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="fake", DEVICE_API_KEY="device-key", FLASK_SECRET_KEY="test-secret", OSRM_URL="")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pytest  # noqa: E402
@@ -55,6 +55,7 @@ class FakeQuery:
         if self.op == "insert":
             row = dict(self.payload)
             row.setdefault("request_id", len(self.rows) + 1)
+            row.setdefault("log_id", len(self.rows) + 1)
             row.setdefault("created_at", datetime.now(timezone.utc).isoformat())  # قيمة افتراضية في Postgres
             self.rows.append(row)
             return type("R", (), {"data": [row]})()

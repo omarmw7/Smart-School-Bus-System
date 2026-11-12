@@ -100,6 +100,13 @@
     </section>
 
     <section class="card">
+      <h2>الإشعارات</h2>
+      <button class="btn" id="enable-notif" type="button" hidden>تفعيل الإشعارات على هذا الجهاز</button>
+      <p class="muted" id="notif-msg"></p>
+      <ul class="list" id="notifications"></ul>
+    </section>
+
+    <section class="card">
       <h2>طلب غياب أو عدم استخدام الباص</h2>
       <form id="request-form">
         <label for="req-type">نوع الطلب</label>
@@ -228,6 +235,70 @@
       : "لا توجد حركات بعد.";
   }
 
+  let notifSeen = null;
+  function renderNotifications(rows) {
+    const list = $("notifications");
+    list.textContent = "";
+    if (!rows.length) {
+      const li = document.createElement("li");
+      li.className = "muted";
+      li.textContent = "لا توجد إشعارات بعد.";
+      list.appendChild(li);
+      return;
+    }
+    for (const n of rows) {
+      const li = document.createElement("li");
+      const text = document.createElement("div");
+      text.textContent = n.message;
+      const time = document.createElement("small");
+      time.className = "muted";
+      time.textContent = fmtDateTime(n.created_at);
+      li.append(text, time);
+      list.appendChild(li);
+    }
+  }
+  function urlBase64ToUint8Array(b64) {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  }
+  async function enablePush() {
+    const btn = $("enable-notif"), note = $("notif-msg");
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("متصفحك لا يدعم إشعارات الخلفية. افتح الصفحة من Chrome أو Safari.");
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") throw new Error("لم يتم السماح بالإشعارات.");
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+      const keyRes = await fetch("/api/push/vapid-public-key");
+      const { public_key } = await keyRes.json();
+      if (!public_key) throw new Error("الإشعارات غير مفعّلة على السيرفر بعد.");
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({
+        userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(public_key)
+      });
+      await api("/push-subscription", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+      btn.hidden = true;
+      note.textContent = "تم تفعيل الإشعارات على هذا الجهاز.";
+    } catch (err) {
+      note.textContent = err.message || "تعذّر تفعيل الإشعارات.";
+    }
+  }
+  function notifyNew(rows) {
+    const btn = $("enable-notif");
+    if (btn && !btn.dataset.wired) {
+      btn.dataset.wired = "1";
+      btn.onclick = enablePush;
+      if ("PushManager" in window && Notification.permission !== "granted") btn.hidden = false;
+    }
+    if (notifSeen === null) {  // أول تحميل: لا نعيد القديم
+      notifSeen = new Set(rows.map(r => r.notification_id));
+      return;
+    }
+    for (const r of rows) notifSeen.add(r.notification_id);
+  }
+
   function renderRequests(rows) {
     const list = $("requests");
     list.textContent = "";
@@ -299,9 +370,13 @@
 
   async function refresh() {
     try {
-      const [status, reqs] = await Promise.all([api("/status"), api("/absence-requests")]);
+      const [status, reqs, notes] = await Promise.all([
+        api("/status"), api("/absence-requests"), api("/notifications")
+      ]);
       renderStatus(status);
       renderRequests(reqs.requests || []);
+      renderNotifications(notes.notifications || []);
+      notifyNew(notes.notifications || []);
     } catch (err) {
       if (err.status === 401) { clearToken(); showLogin("الرمز غير صالح أو منتهي. أدخل الرمز مرة أخرى."); return; }
       showMsg("request-msg", "تعذّر تحديث البيانات: " + err.message, "error");

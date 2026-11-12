@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+
+{% block title %}السائقون والحافلات{% endblock %}
+{% block page_title %}السائقون والحافلات{% endblock %}
+
+{% block content %}
+  {% from "_macros.html" import trip_badge %}
+  <div class="toolbar">
+    <span></span>
+    <a class="btn btn-primary" href="/drivers/new">إضافة سائق</a>
+  </div>
+
+  <section class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>السائق</th><th>الحافلة</th><th>حالة الرحلة</th><th>عدد الطلاب</th><th>الموقع الحالي</th><th>آخر تحديث</th><th></th></tr></thead>
+        <tbody>
+          {% for b in buses %}
+          <tr>
+            <td>{{ b.driver_name }}</td>
+            <td>حافلة {{ b.bus_id }}</td>
+            <td>{{ trip_badge(b.trip_status) }}</td>
+            <td>{{ counts.get(b.bus_id, 0) }}</td>
+            <td>{% if b.current_lat is not none and b.current_lng is not none %}<a href="https://www.google.com/maps?q={{ b.current_lat }},{{ b.current_lng }}" target="_blank" rel="noopener">عرض على الخريطة</a>{% else %}-{% endif %}</td>
+            <td class="ltr">{{ (b.last_updated or '')[:16]|replace('T', ' ') or '-' }}</td>
+            <td>
+              <a href="/drivers/{{ b.bus_id }}/edit">تعديل</a>
+              <form method="post" action="/drivers/{{ b.bus_id }}/delete" class="inline" onsubmit="return confirm('هل تريد حذف هذه الحافلة؟')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="link-danger">حذف</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty">لا يوجد سائقون بعد. أضف سائقًا لبدء الرحلات.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
