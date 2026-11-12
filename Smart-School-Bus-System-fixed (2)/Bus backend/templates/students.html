@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block title %}الطلاب{% endblock %}
+{% block page_title %}الطلاب{% endblock %}
+
+{% block content %}
+  {% from "_macros.html" import student_badge %}
+  <div class="toolbar">
+    <form method="get" action="/students" role="search">
+      <input type="search" name="q" value="{{ q }}" placeholder="ابحث باسم الطالب" aria-label="ابحث باسم الطالب">
+      <button class="btn" type="submit">بحث</button>
+    </form>
+    <a class="btn btn-primary" href="/students/new">إضافة طالب</a>
+  </div>
+
+  <section class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>الاسم</th><th>رقم البصمة</th><th>الحافلة</th><th>السائق</th><th>هاتف ولي الأمر</th><th>الحالة</th><th></th></tr></thead>
+        <tbody>
+          {% for s in students %}
+          {% set bus = buses.get(s.bus_id) %}
+          <tr>
+            <td><a href="/students/{{ s.student_id }}">{{ s.name }}</a></td>
+            <td>{{ s.fingerprint_id }}</td>
+            <td>حافلة {{ s.bus_id }}</td>
+            <td>{{ bus.driver_name if bus else '-' }}</td>
+            <td><span class="ltr">{{ s.parent_phone }}</span></td>
+            <td>{{ student_badge(s.status) }}</td>
+            <td><a href="/students/{{ s.student_id }}/edit">تعديل</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty">{% if q %}لا توجد نتائج مطابقة لبحثك.{% else %}لا يوجد طلاب بعد. أضف أول طالب للبدء.{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

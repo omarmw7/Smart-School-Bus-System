@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block title %}سجل الحضور{% endblock %}
+{% block page_title %}سجل الحضور{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <div class="panel-head"><h2>آخر 200 تسجيل</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>الوقت</th><th>الطالب</th><th>الحافلة</th><th>الإجراء</th><th>الموقع</th></tr></thead>
+        <tbody>
+          {% for l in logs %}
+          <tr>
+            <td class="ltr">{{ l.timestamp[:16]|replace('T', ' ') }}</td>
+            <td><a href="/students/{{ l.student_id }}">{{ names.get(l.student_id, 'طالب محذوف') }}</a></td>
+            <td>حافلة {{ l.bus_id }}</td>
+            <td>{{ l.action }}</td>
+            <td>{% if l.location_lat is not none and l.location_lng is not none %}<a href="https://www.google.com/maps?q={{ l.location_lat }},{{ l.location_lng }}" target="_blank" rel="noopener">عرض على الخريطة</a>{% else %}-{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">لا توجد سجلات حضور بعد.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

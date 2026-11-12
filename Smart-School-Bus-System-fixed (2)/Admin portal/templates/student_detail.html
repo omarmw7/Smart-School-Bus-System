@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ student.name }}{% endblock %}
+{% block page_title %}بيانات الطالب{% endblock %}
+
+{% block content %}
+  {% from "_macros.html" import student_badge, trip_badge %}
+  <div class="toolbar">
+    <a class="btn" href="/students">العودة إلى الطلاب</a>
+    <div class="actions">
+      <a class="btn" href="/students/{{ student.student_id }}/edit">تعديل</a>
+      <form method="post" action="/students/{{ student.student_id }}/delete" onsubmit="return confirm('هل تريد حذف هذا الطالب؟')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger">حذف</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>{{ student.name }}</h2>{{ student_badge(student.status) }}</div>
+    <dl class="details">
+      <div><dt>رقم الطالب</dt><dd>{{ student.student_id }}</dd></div>
+      <div><dt>رقم البصمة</dt><dd>{{ student.fingerprint_id }}</dd></div>
+      <div><dt>هاتف ولي الأمر</dt><dd class="ltr">{{ student.parent_phone }}</dd></div>
+      <div><dt>الحافلة</dt><dd>حافلة {{ student.bus_id }}</dd></div>
+      <div><dt>السائق</dt><dd>{{ bus.driver_name if bus else '-' }}</dd></div>
+      <div><dt>حالة الرحلة</dt><dd>{% if bus %}{{ trip_badge(bus.trip_status) }}{% else %}-{% endif %}</dd></div>
+      <div><dt>تاريخ التسجيل</dt><dd class="ltr">{{ (student.created_at or '')[:10] }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>آخر سجلات الحضور</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>الوقت</th><th>الإجراء</th><th>الحافلة</th><th>الموقع</th></tr></thead>
+        <tbody>
+          {% for l in logs %}
+          <tr>
+            <td class="ltr">{{ l.timestamp[:16]|replace('T', ' ') }}</td>
+            <td>{{ l.action }}</td>
+            <td>حافلة {{ l.bus_id }}</td>
+            <td>{% if l.location_lat is not none and l.location_lng is not none %}<a href="https://www.google.com/maps?q={{ l.location_lat }},{{ l.location_lng }}" target="_blank" rel="noopener">عرض على الخريطة</a>{% else %}-{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty">لا توجد سجلات حضور لهذا الطالب بعد.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
