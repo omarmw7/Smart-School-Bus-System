@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ 'تعديل سائق' if bus.bus_id else 'إضافة سائق' }}{% endblock %}
+{% block page_title %}{{ 'تعديل سائق' if bus.bus_id else 'إضافة سائق' }}{% endblock %}
+
+{% block content %}
+  <form method="post" class="form-card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="driver_name">اسم السائق</label>
+      <input type="text" id="driver_name" name="driver_name" value="{{ bus.driver_name or '' }}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="trip_status">حالة الرحلة</label>
+      <select id="trip_status" name="trip_status">
+        <option value="idle" {% if bus.trip_status not in ['on_route', 'finished'] %}selected{% endif %}>متوقفة</option>
+        <option value="on_route" {% if bus.trip_status == 'on_route' %}selected{% endif %}>على الطريق</option>
+        <option value="finished" {% if bus.trip_status == 'finished' %}selected{% endif %}>انتهت الرحلة</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary">حفظ</button>
+      <a class="btn" href="/drivers">إلغاء</a>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,6 @@
+Flask>=3.0
+supabase
+python-dotenv
+gunicorn
+pywebpush
+requests

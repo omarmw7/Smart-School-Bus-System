@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{% block title %}لوحة التحكم{% endblock %}
+{% block page_title %}لوحة التحكم{% endblock %}
+
+{% block content %}
+  {% from "_macros.html" import student_badge, trip_badge %}
+  <div class="page-head">
+    <div>
+      <h2>مرحبًا بعودتك، {{ session.get('username', 'admin') }}</h2>
+      <p>نظرة عامة على النقل المدرسي اليوم.</p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/drivers/new">إضافة سائق</a>
+      <a class="btn btn-primary" href="/students/new">إضافة طالب</a>
+    </div>
+  </div>
+
+  <section class="stats" aria-label="ملخص">
+    <div class="stat"><span>إجمالي الطلاب</span><strong>{{ stats.students }}</strong><small>المسجلون في النظام</small></div>
+    <div class="stat"><span>الحافلات والسائقون</span><strong>{{ stats.buses }}</strong><small>إجمالي الحافلات</small></div>
+    <div class="stat highlight"><span>حافلات على الطريق</span><strong>{{ stats.on_route }}</strong><small>تعمل حاليًا</small></div>
+    <div class="stat"><span>تسجيلات اليوم</span><strong>{{ stats.logs_today }}</strong><small>صعود ونزول</small></div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel" aria-labelledby="students-h">
+      <div class="panel-head"><h2 id="students-h">أحدث الطلاب</h2><a href="/students">عرض الكل</a></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الاسم</th><th>الحافلة</th><th>الحالة</th></tr></thead>
+          <tbody>
+            {% for s in students %}
+            <tr>
+              <td><a href="/students/{{ s.student_id }}">{{ s.name }}</a></td>
+              <td>حافلة {{ s.bus_id }}</td>
+              <td>{{ student_badge(s.status) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="empty">لا يوجد طلاب بعد. أضف أول طالب للبدء.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="drivers-h">
+      <div class="panel-head"><h2 id="drivers-h">السائقون والحافلات</h2><a href="/drivers">عرض الكل</a></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>السائق</th><th>الحافلة</th><th>حالة الرحلة</th></tr></thead>
+          <tbody>
+            {% for b in bus_list %}
+            <tr>
+              <td>{{ b.driver_name }}</td>
+              <td>حافلة {{ b.bus_id }}</td>
+              <td>{{ trip_badge(b.trip_status) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="empty">لا يوجد سائقون بعد. أضف سائقًا لبدء الرحلات.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+{% endblock %}
