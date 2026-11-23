@@ -3,6 +3,7 @@
 services:
   - type: web
     name: smart-school-bus
+    plan: free
     runtime: python
     rootDir: "Bus backend"
     buildCommand: pip install -r requirements.txt
